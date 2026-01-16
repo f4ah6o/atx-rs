@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REG_DIR="${HOME}/.cache/claude_ttys"
+mkdir -p "$REG_DIR"
+
+SESSION_ID="$(date +%s%N)-$$"
+export CLAUDE_ATTN_SESSION="$SESSION_ID"
+
+tty_path="$(tty 2>/dev/null || true)"
+tty_file="${REG_DIR}/${SESSION_ID}.tty"
+
+if [[ -n "$tty_path" && -w "$tty_path" ]]; then
+  printf '%s' "$tty_path" > "$tty_file"
+fi
+
+reset_bg() {
+  # reset background to default (OSC 111) on the same tty we started with
+  if [[ -n "${tty_path:-}" && -w "${tty_path:-}" ]]; then
+    printf '\033]111\007' >"$tty_path" 2>/dev/null || true
+  fi
+  # optional: remove session tty file
+  # rm -f "$tty_file" 2>/dev/null || true
+}
+
+# Ensure reset happens on normal exit, Ctrl+C, kill, etc.
+trap reset_bg EXIT INT TERM HUP
+
+exec claude "$@"
+
