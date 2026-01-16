@@ -84,16 +84,23 @@ impl BlinkArgs {
 /// チカチカプロセスを実行
 pub fn run_blink(args: BlinkArgs) -> Result<()> {
     // 親プロセスが死んだら自分も終了するように設定
-    // PR_SET_PDEATHSIG: 親プロセス終了時にSIGTERMを受信する
-    unsafe {
-        if libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGTERM) != 0 {
-            return Err(AtxError::Other(anyhow!("prctl failed")));
-        }
-        // 親プロセスが既に死んでいる場合は即座に終了
-        if libc::getppid() == 1 {
-            return Err(AtxError::Other(anyhow!("parent process already dead")));
+    // PR_SET_PDEATHSIG: 親プロセス終了時にSIGTERMを受信する (Linuxのみ)
+
+    #[cfg(target_os = "linux")]
+    {
+        unsafe {
+            if libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGTERM) != 0 {
+                return Err(AtxError::Other(anyhow!("prctl failed")));
+            }
+            // 親プロセスが既に死んでいる場合は即座に終了
+            if libc::getppid() == 1 {
+                return Err(AtxError::Other(anyhow!("parent process already dead")));
+            }
         }
     }
+
+    // macOS は prctl をサポートしていない
+    // 親プロセスの終了検出は代替手段が必要だが、とりあえずスキップして動作させる
 
     let tty = Tty { path: args.tty_path };
     let color_a = Color::Hex(Box::leak(args.color_a.into_boxed_str()));
