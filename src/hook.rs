@@ -32,13 +32,7 @@ struct GenericPayload {
 
 /// フックイベントを処理
 pub fn handle_hook(engine: Engine, payload: Option<String>) -> Result<ColorAction> {
-    eprintln!("atx: hook called, engine={:?}", engine); // デバッグ出力
-
-    let session_id = SessionId::from_env()
-        .map_err(|e| {
-            eprintln!("atx: SessionId::from_env failed: {:?}", e);
-            e
-        })?;
+    let session_id = SessionId::from_env()?;
 
     // セッションIDから元のatx runプロセスのPIDを抽出
     // hookはClaude Codeのプロセスから呼ばれるため、
@@ -53,8 +47,6 @@ pub fn handle_hook(engine: Engine, payload: Option<String>) -> Result<ColorActio
     let tty_path = _runtime
         .get_tty_for_session(engine.as_str(), &session_id)
         .ok_or_else(|| AtxError::TtyDetection("Session TTY file not found".to_string()))?;
-
-    eprintln!("atx: TTY path from file = {:?}", tty_path); // デバッグ出力
 
     // 設定を読み込み
     let settings = AtxSettings::new();
@@ -71,12 +63,10 @@ pub fn handle_hook(engine: Engine, payload: Option<String>) -> Result<ColorActio
     };
 
     // イベントをパースして色アクションを決定
-    eprintln!("atx: payload_text = {}", payload_text); // デバッグ出力
     let action = match engine {
         Engine::Claude => parse_claude_event(&payload_text, &_runtime, &session_id, &tty_path, &config)?,
         Engine::Codex => ColorAction::NoOp, // 将来実装
     };
-    eprintln!("atx: action = {:?}", action); // デバッグ出力
 
     // 色を適用（TTYデバイスにOSCシーケンスを書き込む）
     let tty = Tty { path: PathBuf::from(&tty_path) };

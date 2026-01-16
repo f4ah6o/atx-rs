@@ -22,8 +22,9 @@ use crate::settings::AtxSettings;
 use crate::tty::Tty;
 use clap::Parser;
 use std::env;
-use std::os::unix::process::CommandExt;
-use std::process::Command as StdCommand;
+use std::process::{Stdio, Command as StdCommand};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 fn main() -> Result<()> {
     let args = Args::parse();
@@ -76,20 +77,77 @@ fn execute_run(cmd: cli::RunCommand) -> Result<()> {
     unsafe { env::set_var("ATX_SESSION", session.id.as_str()) };
 
     // クリーンアップハンドラーを設定
-    let _cleanup_handler = cleanup::CleanupHandler::new(
-        runtime,
+    let cleanup_handler = cleanup::CleanupHandler::new(
+        runtime.clone(),
         session.id,
-        tty,
+        tty.clone(),
         config_backup,
     );
 
-    // コマンドを実行（execで置換）
-    let exec_result = StdCommand::new(binary)
-        .args(args)
-        .exec();
+    // Vec<String> を Vec<&str> に変換
+    let args_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
 
-    // execが失敗した場合のみここに到達
-    Err(AtxError::CommandExec(binary.clone(), exec_result.into()))
+    // 子プロセスをspawn（stdioを継承）
+    let mut child = StdCommand::new(binary)
+        .args(&args_refs)
+        .stdin(Stdio::inherit())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .spawn()
+        .map_err(|e| AtxError::CommandExec(binary.clone(), e))?;
+
+    let child_pid = child.id();
+    let cleanup_flag = Arc::clone(&cleanup_handler.cleanup_done);
+
+    // シグナルフォワーディングを設定
+    setup_signal_forwarding(child_pid, cleanup_flag, runtime, tty)?;
+
+    // 子プロセスの終了を待機
+    let status = child.wait()
+        .map_err(|e| AtxError::Other(anyhow::anyhow!("Failed to wait for child: {}", e)))?;
+
+    // CleanupHandler Dropが自動的に実行される
+    if status.success() {
+        Ok(())
+    } else {
+        Err(AtxError::Other(anyhow::anyhow!("Child exited: {}", status)))
+    }
+}
+
+/// シグナルフォワーディングを設定
+fn setup_signal_forwarding(
+    child_pid: u32,
+    cleanup_flag: Arc<AtomicBool>,
+    runtime: Runtime,
+    tty: Option<Tty>,
+) -> Result<()> {
+    use signal_hook::consts::signal;
+    use signal_hook::low_level;
+
+    for sig in &[signal::SIGINT, signal::SIGTERM, signal::SIGHUP] {
+        let cleanup_done = Arc::clone(&cleanup_flag);
+        let tty_clone = tty.clone();
+        let runtime_clone = runtime.clone();
+
+        unsafe {
+            low_level::register(*sig, move || {
+                if cleanup_done.swap(true, Ordering::SeqCst) {
+                    return;
+                }
+
+                // 子プロセスにシグナルを転送
+                let _ = low_level::raise(*sig);
+
+                // 即時クリーンアップ
+                if let Some(ref t) = tty_clone {
+                    t.reset_background();
+                }
+                let _ = crate::blink::stop_blink(&runtime_clone);
+            })?;
+        }
+    }
+
+    Ok(())
 }
 
 /// `atx hook --engine <name>` を実行

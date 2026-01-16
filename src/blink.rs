@@ -83,6 +83,18 @@ impl BlinkArgs {
 
 /// チカチカプロセスを実行
 pub fn run_blink(args: BlinkArgs) -> Result<()> {
+    // 親プロセスが死んだら自分も終了するように設定
+    // PR_SET_PDEATHSIG: 親プロセス終了時にSIGTERMを受信する
+    unsafe {
+        if libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGTERM) != 0 {
+            return Err(AtxError::Other(anyhow!("prctl failed")));
+        }
+        // 親プロセスが既に死んでいる場合は即座に終了
+        if libc::getppid() == 1 {
+            return Err(AtxError::Other(anyhow!("parent process already dead")));
+        }
+    }
+
     let tty = Tty { path: args.tty_path };
     let color_a = Color::Hex(Box::leak(args.color_a.into_boxed_str()));
     let color_b = Color::Hex(Box::leak(args.color_b.into_boxed_str()));
@@ -135,8 +147,6 @@ pub fn start_blink(
     writeln!(file, "{}", child.id())
         .map_err(AtxError::Io)?;
 
-    eprintln!("atx: started blink process (PID={})", child.id());
-
     Ok(())
 }
 
@@ -159,7 +169,6 @@ pub fn stop_blink(runtime: &Runtime) -> Result<()> {
             if let Ok(pid_str) = fs::read_to_string(&path) {
                 if let Ok(pid) = pid_str.trim().parse::<u32>() {
                     // プロセスにSIGTERMを送信
-                    eprintln!("atx: stopping blink process (PID={})", pid);
                     let _ = unsafe {
                         libc::kill(pid as i32, libc::SIGTERM);
                     };

@@ -77,7 +77,7 @@ fn default_blink_enabled() -> bool {
 }
 
 fn default_blink_interval() -> u64 {
-    500
+    2000
 }
 
 fn default_blink_color_a() -> String {
@@ -160,7 +160,7 @@ mod tests {
         assert_eq!(settings.colors.permission, "#4a0000");
         assert_eq!(settings.colors.idle, "#3b2a00");
         assert!(settings.blink.enabled);
-        assert_eq!(settings.blink.interval_ms, 500);
+        assert_eq!(settings.blink.interval_ms, 2000);
         assert_eq!(settings.blink.color_a, "#002b36");
         assert_eq!(settings.blink.color_b, "#1a3a00");
     }

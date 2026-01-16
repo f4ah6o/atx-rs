@@ -5,7 +5,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 /// ランタイムディレクトリマネージャー
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Runtime {
     pub pid: u32,
     pub dir: PathBuf,

@@ -17,7 +17,7 @@ pub struct CleanupHandler {
     session_id: SessionId,
     tty: Option<Tty>,
     config_backup: Option<ConfigBackup>,
-    cleanup_done: Arc<AtomicBool>,
+    pub cleanup_done: Arc<AtomicBool>,
 }
 
 impl CleanupHandler {
@@ -42,18 +42,21 @@ impl CleanupHandler {
             return; // 既に実行済み
         }
 
-        // 1. 背景色をリセット
+        // 1. blinkプロセスを停止
+        let _ = crate::blink::stop_blink(&self.runtime);
+
+        // 2. 背景色をリセット
         if let Some(ref tty) = self.tty {
             tty.reset_background();
         }
 
-        // 2. 設定ファイルを復元
+        // 3. 設定ファイルを復元
         if let Some(ref backup) = self.config_backup {
             let config = ClaudeConfig::from_path(backup.original_path.clone());
             let _ = config.restore(backup); // エラーは無視
         }
 
-        // 3. 一時ディレクトリ削除は Drop で行われる
+        // 4. 一時ディレクトリ削除は Drop で行われる
     }
 
     /// シグナルハンドラーを登録
@@ -61,11 +64,13 @@ impl CleanupHandler {
         use signal_hook::consts::signal;
 
         let cleanup_flag = Arc::clone(&self.cleanup_done);
+        let runtime = self.runtime.clone();
 
         // SIGINT, SIGTERM, SIGHUP を監視
         for sig in &[signal::SIGINT, signal::SIGTERM, signal::SIGHUP] {
             let cleanup_done = Arc::clone(&cleanup_flag);
             let tty = self.tty.clone();
+            let runtime_clone = runtime.clone();
 
             // シグナルハンドラー内で実行する関数
             unsafe {
@@ -73,6 +78,8 @@ impl CleanupHandler {
                     if cleanup_done.swap(true, Ordering::SeqCst) {
                         return; // 既に実行済み
                     }
+                    // blinkプロセスを停止
+                    let _ = crate::blink::stop_blink(&runtime_clone);
                     // 背景色リセット（最小限の操作）
                     if let Some(ref tty) = tty {
                         tty.reset_background();
@@ -83,6 +90,21 @@ impl CleanupHandler {
         }
 
         Ok(())
+    }
+
+    /// 緊急クリーンアップ（シグナルハンドラー内で実行）
+    pub fn emergency_cleanup(&self) {
+        if self.cleanup_done.swap(true, Ordering::SeqCst) {
+            return;
+        }
+
+        // 1. blinkプロセスを停止
+        let _ = crate::blink::stop_blink(&self.runtime);
+
+        // 2. 背景色をリセット
+        if let Some(ref tty) = self.tty {
+            tty.reset_background();
+        }
     }
 }
 
