@@ -38,9 +38,18 @@ mod tests {
 
     #[test]
     fn test_osc_set_sequence() {
-        assert_eq!(Color::PERMISSION_RED.to_osc_set_sequence(), "\x1b]11;#4a0000\x07");
-        assert_eq!(Color::IDLE_YELLOW.to_osc_set_sequence(), "\x1b]11;#3b2a00\x07");
-        assert_eq!(Color::STOP_BLUE.to_osc_set_sequence(), "\x1b]11;#002b36\x07");
+        assert_eq!(
+            Color::PERMISSION_RED.to_osc_set_sequence(),
+            "\x1b]11;#4a0000\x07"
+        );
+        assert_eq!(
+            Color::IDLE_YELLOW.to_osc_set_sequence(),
+            "\x1b]11;#3b2a00\x07"
+        );
+        assert_eq!(
+            Color::STOP_BLUE.to_osc_set_sequence(),
+            "\x1b]11;#002b36\x07"
+        );
     }
 
     #[test]

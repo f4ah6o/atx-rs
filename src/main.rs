@@ -11,8 +11,8 @@ mod session;
 mod settings;
 mod tty;
 
-use crate::cli::Args;
 use crate::clean::clean;
+use crate::cli::Args;
 use crate::config::ClaudeConfig;
 use crate::error::{AtxError, Result};
 use crate::hook::handle_hook;
@@ -22,7 +22,7 @@ use crate::settings::AtxSettings;
 use crate::tty::Tty;
 use clap::Parser;
 use std::env;
-use std::process::{Stdio, Command as StdCommand};
+use std::process::{Command as StdCommand, Stdio};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -44,7 +44,9 @@ fn main() -> Result<()> {
 /// `atx run -- <command>` を実行
 fn execute_run(cmd: cli::RunCommand) -> Result<()> {
     if cmd.command.is_empty() {
-        return Err(AtxError::Other(anyhow::anyhow!("コマンドが指定されていません")));
+        return Err(AtxError::Other(anyhow::anyhow!(
+            "コマンドが指定されていません"
+        )));
     }
 
     let binary = &cmd.command[0];
@@ -54,7 +56,10 @@ fn execute_run(cmd: cli::RunCommand) -> Result<()> {
 
     // セッションを作成
     let session = Session::new();
-    eprintln!("atx: session.id={}, session.pid={}", session.id, session.pid); // デバッグ出力
+    eprintln!(
+        "atx: session.id={}, session.pid={}",
+        session.id, session.pid
+    ); // デバッグ出力
 
     let runtime = Runtime::new(session.pid)?;
     eprintln!("atx: runtime.dir={:?}", runtime.dir); // デバッグ出力
@@ -77,12 +82,8 @@ fn execute_run(cmd: cli::RunCommand) -> Result<()> {
     unsafe { env::set_var("ATX_SESSION", session.id.as_str()) };
 
     // クリーンアップハンドラーを設定
-    let cleanup_handler = cleanup::CleanupHandler::new(
-        runtime.clone(),
-        session.id,
-        tty.clone(),
-        config_backup,
-    );
+    let cleanup_handler =
+        cleanup::CleanupHandler::new(runtime.clone(), session.id, tty.clone(), config_backup);
 
     // Vec<String> を Vec<&str> に変換
     let args_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
@@ -103,7 +104,8 @@ fn execute_run(cmd: cli::RunCommand) -> Result<()> {
     setup_signal_forwarding(child_pid, cleanup_flag, runtime, tty)?;
 
     // 子プロセスの終了を待機
-    let status = child.wait()
+    let status = child
+        .wait()
         .map_err(|e| AtxError::Other(anyhow::anyhow!("Failed to wait for child: {}", e)))?;
 
     // CleanupHandler Dropが自動的に実行される
@@ -116,7 +118,7 @@ fn execute_run(cmd: cli::RunCommand) -> Result<()> {
 
 /// シグナルフォワーディングを設定
 fn setup_signal_forwarding(
-    child_pid: u32,
+    _child_pid: u32,
     cleanup_flag: Arc<AtomicBool>,
     runtime: Runtime,
     tty: Option<Tty>,
@@ -171,7 +173,8 @@ fn execute_blink(cmd: cli::BlinkCommand) -> Result<()> {
         tty_path: std::path::PathBuf::from(cmd.tty),
         color_a: cmd.color_a,
         color_b: cmd.color_b,
-        interval_ms: cmd.interval
+        interval_ms: cmd
+            .interval
             .parse()
             .map_err(|e| AtxError::Other(anyhow::anyhow!("invalid interval: {}", e)))?,
     };

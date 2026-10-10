@@ -59,8 +59,10 @@ impl BlinkArgs {
                 }
                 "--interval" => {
                     if i + 1 < args.len() {
-                        interval_ms = Some(args[i + 1].parse::<u64>()
-                            .map_err(|e| AtxError::Other(anyhow!("invalid interval: {}", e)))?);
+                        interval_ms =
+                            Some(args[i + 1].parse::<u64>().map_err(|e| {
+                                AtxError::Other(anyhow!("invalid interval: {}", e))
+                            })?);
                         i += 2;
                     } else {
                         return Err(AtxError::Other(anyhow!("--interval requires an argument")));
@@ -76,7 +78,8 @@ impl BlinkArgs {
             tty_path: tty_path.ok_or_else(|| AtxError::Other(anyhow!("--tty is required")))?,
             color_a: color_a.ok_or_else(|| AtxError::Other(anyhow!("--color-a is required")))?,
             color_b: color_b.ok_or_else(|| AtxError::Other(anyhow!("--color-b is required")))?,
-            interval_ms: interval_ms.ok_or_else(|| AtxError::Other(anyhow!("--interval is required")))?,
+            interval_ms: interval_ms
+                .ok_or_else(|| AtxError::Other(anyhow!("--interval is required")))?,
         })
     }
 }
@@ -102,7 +105,9 @@ pub fn run_blink(args: BlinkArgs) -> Result<()> {
     // macOS は prctl をサポートしていない
     // 親プロセスの終了検出は代替手段が必要だが、とりあえずスキップして動作させる
 
-    let tty = Tty { path: args.tty_path };
+    let tty = Tty {
+        path: args.tty_path,
+    };
     let color_a = Color::Hex(Box::leak(args.color_a.into_boxed_str()));
     let color_b = Color::Hex(Box::leak(args.color_b.into_boxed_str()));
     let duration = Duration::from_millis(args.interval_ms);
@@ -130,29 +135,29 @@ pub fn start_blink(
     stop_blink(runtime)?;
 
     // 現在のバイナリのフルパスを取得
-    let current_exe = std::env::current_exe()
-        .map_err(AtxError::Io)?;
+    let current_exe = std::env::current_exe().map_err(AtxError::Io)?;
 
     // blinkプロセスを起動
     let child = Command::new(&current_exe)
         .arg("blink")
-        .arg("--tty").arg(tty_path)
-        .arg("--color-a").arg(&config.color_a)
-        .arg("--color-b").arg(&config.color_b)
-        .arg("--interval").arg(config.interval_ms.to_string())
+        .arg("--tty")
+        .arg(tty_path)
+        .arg("--color-a")
+        .arg(&config.color_a)
+        .arg("--color-b")
+        .arg(&config.color_b)
+        .arg("--interval")
+        .arg(config.interval_ms.to_string())
         .spawn()
         .map_err(|e| AtxError::Other(anyhow!("blinkプロセスの起動に失敗: {}", e)))?;
 
     // PIDを保存
     let pid_file = runtime.blink_pid_file(session_id);
     if let Some(parent) = pid_file.parent() {
-        fs::create_dir_all(parent)
-            .map_err(AtxError::Io)?;
+        fs::create_dir_all(parent).map_err(AtxError::Io)?;
     }
-    let mut file = File::create(&pid_file)
-        .map_err(AtxError::Io)?;
-    writeln!(file, "{}", child.id())
-        .map_err(AtxError::Io)?;
+    let mut file = File::create(&pid_file).map_err(AtxError::Io)?;
+    writeln!(file, "{}", child.id()).map_err(AtxError::Io)?;
 
     Ok(())
 }
@@ -166,22 +171,21 @@ pub fn stop_blink(runtime: &Runtime) -> Result<()> {
         return Ok(());
     }
 
-    let entries = fs::read_dir(&blink_dir)
-        .map_err(AtxError::Io)?;
+    let entries = fs::read_dir(&blink_dir).map_err(AtxError::Io)?;
 
     for entry in entries.flatten() {
         let path = entry.path();
         if path.extension().and_then(|s| s.to_str()) == Some("pid") {
             // PIDファイルを読み取り
-            if let Ok(pid_str) = fs::read_to_string(&path) {
-                if let Ok(pid) = pid_str.trim().parse::<u32>() {
-                    // プロセスにSIGTERMを送信
-                    let _ = unsafe {
-                        libc::kill(pid as i32, libc::SIGTERM);
-                    };
-                    // PIDファイルを削除
-                    let _ = fs::remove_file(&path);
-                }
+            if let Ok(pid_str) = fs::read_to_string(&path)
+                && let Ok(pid) = pid_str.trim().parse::<u32>()
+            {
+                // プロセスにSIGTERMを送信
+                unsafe {
+                    libc::kill(pid as i32, libc::SIGTERM);
+                };
+                // PIDファイルを削除
+                let _ = fs::remove_file(&path);
             }
         }
     }

@@ -7,21 +7,12 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Default)]
 pub struct Settings {
     #[serde(default)]
     pub colors: ColorsConfig,
     #[serde(default)]
     pub blink: BlinkConfig,
-}
-
-impl Default for Settings {
-    fn default() -> Self {
-        Settings {
-            colors: ColorsConfig::default(),
-            blink: BlinkConfig::default(),
-        }
-    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -125,8 +116,7 @@ impl AtxSettings {
             return Ok(Settings::default());
         }
 
-        let content = fs::read_to_string(&self.path)
-            .map_err(AtxError::Io)?;
+        let content = fs::read_to_string(&self.path).map_err(AtxError::Io)?;
 
         toml::from_str(&content)
             .map_err(|e| AtxError::Other(anyhow::anyhow!("設定ファイルのパースに失敗: {}", e)))
@@ -135,8 +125,7 @@ impl AtxSettings {
     /// デフォルト設定ファイルを生成
     pub fn generate_default(&self) -> Result<()> {
         let settings = Settings::default();
-        let content = toml::to_string_pretty(&settings)
-            .map_err(|e| AtxError::Other(e.into()))?;
+        let content = toml::to_string_pretty(&settings).map_err(|e| AtxError::Other(e.into()))?;
 
         // 親ディレクトリを作成
         if let Some(parent) = self.path.parent() {
