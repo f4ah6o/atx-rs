@@ -2,8 +2,8 @@ use crate::config::{ClaudeConfig, ConfigBackup};
 use crate::runtime::Runtime;
 use crate::session::SessionId;
 use crate::tty::Tty;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 /// クリーンアップハンドラー
 ///

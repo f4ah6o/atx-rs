@@ -21,18 +21,15 @@ impl Runtime {
         let dir = base.join(format!("atx-{}", pid));
 
         // ディレクトリ作成
-        fs::create_dir_all(&dir)
-            .map_err(|e| AtxError::RuntimeDir(dir.clone(), e))?;
+        fs::create_dir_all(&dir).map_err(|e| AtxError::RuntimeDir(dir.clone(), e))?;
 
         // サブディレクトリ作成
         fs::create_dir_all(dir.join("ttys/claude"))
             .map_err(|e| AtxError::RuntimeDir(dir.clone(), e))?;
         fs::create_dir_all(dir.join("ttys/codex"))
             .map_err(|e| AtxError::RuntimeDir(dir.clone(), e))?;
-        fs::create_dir_all(dir.join("backup"))
-            .map_err(|e| AtxError::RuntimeDir(dir.clone(), e))?;
-        fs::create_dir_all(dir.join("blink"))
-            .map_err(|e| AtxError::RuntimeDir(dir.clone(), e))?;
+        fs::create_dir_all(dir.join("backup")).map_err(|e| AtxError::RuntimeDir(dir.clone(), e))?;
+        fs::create_dir_all(dir.join("blink")).map_err(|e| AtxError::RuntimeDir(dir.clone(), e))?;
 
         Ok(Runtime {
             pid,
@@ -70,7 +67,12 @@ impl Runtime {
     }
 
     /// TTYを登録
-    pub fn register_tty(&self, engine: &str, session_id: &SessionId, tty_path: &Path) -> Result<()> {
+    pub fn register_tty(
+        &self,
+        engine: &str,
+        session_id: &SessionId,
+        tty_path: &Path,
+    ) -> Result<()> {
         let tty_file = self.tty_file(engine, session_id);
         fs::write(&tty_file, tty_path.to_string_lossy().as_bytes())?;
         Ok(())
@@ -120,12 +122,12 @@ pub fn find_orphaned_runtimes() -> Vec<PathBuf> {
                 if name_str.starts_with("atx-") {
                     let path = entry.path();
                     // PID部分を抽出してチェック
-                    if let Some(pid_str) = name_str.strip_prefix("atx-") {
-                        if let Ok(pid) = pid_str.parse::<u32>() {
-                            // プロセスが存在するかチェック
-                            if !process_exists(pid) {
-                                orphans.push(path);
-                            }
+                    if let Some(pid_str) = name_str.strip_prefix("atx-")
+                        && let Ok(pid) = pid_str.parse::<u32>()
+                    {
+                        // プロセスが存在するかチェック
+                        if !process_exists(pid) {
+                            orphans.push(path);
                         }
                     }
                 }

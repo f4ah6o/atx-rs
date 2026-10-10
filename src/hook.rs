@@ -64,12 +64,16 @@ pub fn handle_hook(engine: Engine, payload: Option<String>) -> Result<ColorActio
 
     // イベントをパースして色アクションを決定
     let action = match engine {
-        Engine::Claude => parse_claude_event(&payload_text, &_runtime, &session_id, &tty_path, &config)?,
+        Engine::Claude => {
+            parse_claude_event(&payload_text, &_runtime, &session_id, &tty_path, &config)?
+        }
         Engine::Codex => ColorAction::NoOp, // 将来実装
     };
 
     // 色を適用（TTYデバイスにOSCシーケンスを書き込む）
-    let tty = Tty { path: PathBuf::from(&tty_path) };
+    let tty = Tty {
+        path: PathBuf::from(&tty_path),
+    };
     match action {
         ColorAction::Set(color) => {
             tty.set_color(color);
@@ -112,7 +116,12 @@ fn parse_claude_event(
             }
             Some("UserPromptSubmit") => {
                 // blinkを開始
-                let _ = blink::start_blink(runtime, session_id, &PathBuf::from(tty_path), &config.blink);
+                let _ = blink::start_blink(
+                    runtime,
+                    session_id,
+                    &PathBuf::from(tty_path),
+                    &config.blink,
+                );
                 return Ok(ColorAction::NoOp);
             }
             _ => {}
@@ -133,7 +142,9 @@ fn claude_event_to_action(event: &ClaudeEvent, colors: &ColorsConfig) -> ColorAc
         ClaudeEvent::Notification { notification_type } => match notification_type.as_str() {
             "permission_prompt" => {
                 // 設定ファイルの色を使用
-                ColorAction::Set(Color::Hex(Box::leak(colors.permission.clone().into_boxed_str())))
+                ColorAction::Set(Color::Hex(Box::leak(
+                    colors.permission.clone().into_boxed_str(),
+                )))
             }
             "idle_prompt" => {
                 // 設定ファイルの色を使用

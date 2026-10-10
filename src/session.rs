@@ -21,8 +21,7 @@ impl SessionId {
 
     /// 環境変数 ATX_SESSION からパース
     pub fn from_env() -> Result<Self> {
-        let val = env::var("ATX_SESSION")
-            .map_err(|_| AtxError::SessionNotSet)?;
+        let val = env::var("ATX_SESSION").map_err(|_| AtxError::SessionNotSet)?;
         // 形式バリデーション: <数字>-<数字>
         if !val.contains('-') || val.split('-').any(|s| s.is_empty()) {
             return Err(AtxError::InvalidSessionId(val));
@@ -84,7 +83,10 @@ mod tests {
     fn test_session_from_env_missing() {
         // ATX_SESSIONが未設定の場合
         unsafe { env::remove_var("ATX_SESSION") };
-        assert!(matches!(SessionId::from_env(), Err(AtxError::SessionNotSet)));
+        assert!(matches!(
+            SessionId::from_env(),
+            Err(AtxError::SessionNotSet)
+        ));
     }
 
     #[test]

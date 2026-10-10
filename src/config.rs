@@ -71,8 +71,7 @@ impl ClaudeConfig {
     /// 各イベントの配列の末尾にatx hookを追加します。
     pub fn inject_hook(&self, _backup: &ConfigBackup) -> Result<()> {
         // 現在のバイナリのフルパスを取得
-        let current_exe = std::env::current_exe()
-            .map_err(AtxError::Io)?;
+        let current_exe = std::env::current_exe().map_err(AtxError::Io)?;
         let hook_command = format!("{} hook --engine claude", current_exe.display());
 
         eprintln!("atx: injecting hook command: {}", hook_command); // デバッグ出力
@@ -84,8 +83,7 @@ impl ClaudeConfig {
 
         // 現在の設定を読み込み
         let mut settings: serde_json::Value = if self.exists() {
-            let content = fs::read_to_string(&self.path)
-                .map_err(AtxError::Io)?;
+            let content = fs::read_to_string(&self.path).map_err(AtxError::Io)?;
             serde_json::from_str(&content)
                 .map_err(|e| AtxError::ConfigParse(self.path.clone(), e))?
         } else {
@@ -93,14 +91,16 @@ impl ClaudeConfig {
         };
 
         // hooksオブジェクトを取得または作成
-        let settings_obj = settings.as_object_mut()
+        let settings_obj = settings
+            .as_object_mut()
             .ok_or_else(|| AtxError::Other(anyhow::anyhow!("settings is not an object")))?;
 
         if !settings_obj.contains_key("hooks") {
             settings_obj.insert("hooks".to_string(), json!({}));
         }
 
-        let hooks = settings_obj["hooks"].as_object_mut()
+        let hooks = settings_obj["hooks"]
+            .as_object_mut()
             .ok_or_else(|| AtxError::Other(anyhow::anyhow!("hooks is not an object")))?;
 
         // 各イベントにhookを追加
@@ -110,11 +110,14 @@ impl ClaudeConfig {
                 .entry(event)
                 .or_insert_with(|| json!([]))
                 .as_array_mut()
-                .ok_or_else(|| AtxError::Other(anyhow::anyhow!("hooks[{}] is not an array", event)))?;
+                .ok_or_else(|| {
+                    AtxError::Other(anyhow::anyhow!("hooks[{}] is not an array", event))
+                })?;
 
             // 重複チェック（正しい構造で）
             let already_exists = event_array.iter().any(|entry: &serde_json::Value| {
-                entry.get("hooks")
+                entry
+                    .get("hooks")
                     .and_then(|h: &serde_json::Value| h.as_array())
                     .map(|arr: &Vec<serde_json::Value>| {
                         arr.iter().any(|hook: &serde_json::Value| {
@@ -137,17 +140,15 @@ impl ClaudeConfig {
         }
 
         // 曻き込み
-        let content = serde_json::to_string_pretty(&settings)
-            .map_err(|e| AtxError::Other(e.into()))?;
+        let content =
+            serde_json::to_string_pretty(&settings).map_err(|e| AtxError::Other(e.into()))?;
 
         // 親ディレクトリを作成
         if let Some(parent) = self.path.parent() {
-            fs::create_dir_all(parent)
-                .map_err(AtxError::Io)?;
+            fs::create_dir_all(parent).map_err(AtxError::Io)?;
         }
 
-        fs::write(&self.path, content)
-            .map_err(|e| AtxError::ConfigWrite(self.path.clone(), e))?;
+        fs::write(&self.path, content).map_err(|e| AtxError::ConfigWrite(self.path.clone(), e))?;
 
         Ok(())
     }
@@ -170,8 +171,8 @@ impl ClaudeConfig {
         let stderr = String::from_utf8_lossy(&output.stderr);
 
         // "invalid" が含まれている場合は検証失敗
-        let has_invalid = stdout.to_lowercase().contains("invalid")
-            || stderr.to_lowercase().contains("invalid");
+        let has_invalid =
+            stdout.to_lowercase().contains("invalid") || stderr.to_lowercase().contains("invalid");
 
         if has_invalid {
             eprintln!("claude doctor detected invalid configuration:");

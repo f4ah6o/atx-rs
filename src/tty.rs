@@ -15,10 +15,10 @@ impl Tty {
     /// 現在のTTYを検出
     pub fn detect() -> Option<Self> {
         // 優先: ttyname(0) -> /dev/tty
-        if let Ok(path) = std::fs::read_link("/proc/self/fd/0") {
-            if path.starts_with("/dev/tty") || path.starts_with("/dev/pts") {
-                return Some(Tty { path });
-            }
+        if let Ok(path) = std::fs::read_link("/proc/self/fd/0")
+            && (path.starts_with("/dev/tty") || path.starts_with("/dev/pts"))
+        {
+            return Some(Tty { path });
         }
         // フォールバック: /dev/tty
         if Path::new("/dev/tty").exists() {
@@ -32,10 +32,7 @@ impl Tty {
     /// TTYが書き込み可能かチェック
     pub fn is_writable(&self) -> bool {
         // 実際に開いてみる
-        OpenOptions::new()
-            .write(true)
-            .open(&self.path)
-            .is_ok()
+        OpenOptions::new().write(true).open(&self.path).is_ok()
     }
 
     /// OSCシーケンスをTTYに書き込む
@@ -49,18 +46,21 @@ impl Tty {
                 e
             })?;
 
-        file.write_all(data)
-            .map_err(|e| {
-                eprintln!("atx: TTY write failed ({}): {}", self.path.display(), e);
-                e
-            })?;
+        file.write_all(data).map_err(|e| {
+            eprintln!("atx: TTY write failed ({}): {}", self.path.display(), e);
+            e
+        })?;
 
         Ok(())
     }
 
     /// OSCシーケンスをTTYに書き込む（失敗してもエラーを返さない）
     pub fn write_osc_silent(&self, data: &[u8]) {
-        eprintln!("atx: Writing OSC sequence to {}: {:?}", self.path.display(), data);
+        eprintln!(
+            "atx: Writing OSC sequence to {}: {:?}",
+            self.path.display(),
+            data
+        );
         let _ = self.write_osc(data);
     }
 
